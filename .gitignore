@@ -5,3 +5,8 @@
 
 .vscode/
 .idea/
+
+*.db
+*.sqlite
+*.sqlite3
+data.db
