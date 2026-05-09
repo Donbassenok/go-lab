@@ -65,3 +65,92 @@ func (h *PlantHandler) GetPlantByID(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(plant)
 }
+
+func (h *PlantHandler) GetAllPlants(w http.ResponseWriter, r *http.Request) {
+	plants, err := h.repo.GetAll()
+	if err != nil {
+		http.Error(w, "Помилка отримання даних", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(plants)
+}
+
+func (h *PlantHandler) UpdatePlant(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "Невірний ID", http.StatusBadRequest)
+		return
+	}
+
+	var plant model.Plant
+	if err := json.NewDecoder(r.Body).Decode(&plant); err != nil {
+		http.Error(w, "Невірний формат JSON", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.validate.Struct(plant); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err := h.repo.Update(id, plant); err != nil {
+		http.Error(w, "Помилка оновлення", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"status":"success", "message":"Plant updated"}`))
+}
+
+func (h *PlantHandler) PatchPlant(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "Невірний ID", http.StatusBadRequest)
+		return
+	}
+
+	var updates map[string]interface{}
+	if err := json.NewDecoder(r.Body).Decode(&updates); err != nil {
+		http.Error(w, "Невірний формат JSON", http.StatusBadRequest)
+		return
+	}
+
+	if ageVal, exists := updates["age"]; exists {
+		if ageFloat, ok := ageVal.(float64); ok && ageFloat <= 0 {
+			http.Error(w, "Age must be greater than 0", http.StatusBadRequest)
+			return
+		}
+	}
+
+	if err := h.repo.Patch(id, updates); err != nil {
+		http.Error(w, "Помилка часткового оновлення", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"status":"success", "message":"Plant patched"}`))
+}
+
+func (h *PlantHandler) DeletePlant(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "Невірний ID", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.repo.Delete(id); err != nil {
+		http.Error(w, "Помилка видалення", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"status":"success", "message":"Plant deleted"}`))
+}
