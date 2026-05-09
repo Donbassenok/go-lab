@@ -6,6 +6,9 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/Donbassenok/go-lab/internal/handler"
+	"github.com/Donbassenok/go-lab/internal/repository"
+
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/sqlite3"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
@@ -21,7 +24,7 @@ func main() {
 	dbURL := viper.GetString("DB_URL")
 	fmt.Printf("Підключаємося до БД за адресою: %s\n", dbURL)
 
-	db, err := sql.Open("sqlite3", "data.db")
+	db, err := sql.Open("sqlite3", dbURL)
 	if err != nil {
 		log.Fatalf("Не вдалося відкрити БД: %v", err)
 	}
@@ -46,13 +49,22 @@ func main() {
 	}
 	fmt.Println("Міграції успішно виконані! База готова.")
 
-	http.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
+	repo := repository.NewSQLitePlantRepo(db)
+
+	plantHandler := handler.NewPlantHandler(repo)
+
+	mux := http.NewServeMux()
+
+	plantHandler.RegisterRoutes(mux)
+
+	mux.HandleFunc("GET /ping", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "pong")
 	})
 
 	port := ":8080"
 	fmt.Printf("Сервер запускається на порту %s...\n", port)
-	if err := http.ListenAndServe(port, nil); err != nil {
+	
+	if err := http.ListenAndServe(port, mux); err != nil {
 		log.Fatalf("Помилка при запуску сервера: %v", err)
 	}
 }

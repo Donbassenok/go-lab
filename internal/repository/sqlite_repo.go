@@ -3,6 +3,7 @@ package repository
 import (
 	"database/sql"
 	"errors"
+	"strings"
 
 	"github.com/Donbassenok/go-lab/internal/model"
 )
@@ -15,7 +16,6 @@ func NewSQLitePlantRepo(db *sql.DB) *SQLitePlantRepo {
 	return &SQLitePlantRepo{db: db}
 }
 
-// 1. CREATE - Додавання нової рослини
 func (r *SQLitePlantRepo) Create(plant model.Plant) (int, error) {
 	query := `INSERT INTO plants (name, species, age) VALUES (?, ?, ?) RETURNING id`
 	var id int
@@ -26,7 +26,6 @@ func (r *SQLitePlantRepo) Create(plant model.Plant) (int, error) {
 	return id, nil
 }
 
-// 2. GET BY ID - Отримання однієї рослини за ID
 func (r *SQLitePlantRepo) GetByID(id int) (model.Plant, error) {
 	query := `SELECT id, name, species, age FROM plants WHERE id = ?`
 	var p model.Plant
@@ -40,7 +39,6 @@ func (r *SQLitePlantRepo) GetByID(id int) (model.Plant, error) {
 	return p, nil
 }
 
-// 3. GET ALL - Отримання списку всіх рослин
 func (r *SQLitePlantRepo) GetAll() ([]model.Plant, error) {
 	query := `SELECT id, name, species, age FROM plants`
 	rows, err := r.db.Query(query)
@@ -60,7 +58,6 @@ func (r *SQLitePlantRepo) GetAll() ([]model.Plant, error) {
 	return plants, nil
 }
 
-// 4. UPDATE - Оновлення даних рослини
 func (r *SQLitePlantRepo) Update(id int, plant model.Plant) error {
 	query := `UPDATE plants SET name = ?, species = ?, age = ? WHERE id = ?`
 	res, err := r.db.Exec(query, plant.Name, plant.Species, plant.Age, id)
@@ -77,7 +74,6 @@ func (r *SQLitePlantRepo) Update(id int, plant model.Plant) error {
 	return nil
 }
 
-// 5. DELETE - Видалення рослини
 func (r *SQLitePlantRepo) Delete(id int) error {
 	query := `DELETE FROM plants WHERE id = ?`
 	res, err := r.db.Exec(query, id)
@@ -94,22 +90,47 @@ func (r *SQLitePlantRepo) Delete(id int) error {
 	return nil
 }
 
-// 6. GET BY SPECIES - Пошук рослин за видом
-func (r *SQLitePlantRepo) GetBySpecies(species string) ([]model.Plant, error) {
-	query := `SELECT id, name, species, age FROM plants WHERE species = ?`
-	rows, err := r.db.Query(query, species)
-	if err != nil {
-		return nil, err
+func (r *SQLitePlantRepo) Patch(id int, updates map[string]interface{}) error {
+	if len(updates) == 0 {
+		return nil
 	}
-	defer rows.Close()
 
-	var plants []model.Plant
-	for rows.Next() {
-		var p model.Plant
-		if err := rows.Scan(&p.ID, &p.Name, &p.Species, &p.Age); err != nil {
-			return nil, err
-		}
-		plants = append(plants, p)
+	query := "UPDATE plants SET "
+	var args []interface{}
+	var setParts []string
+
+	validColumns := map[string]bool{
+		"name":    true,
+		"species": true,
+		"age":     true,
 	}
-	return plants, nil
+
+	for key, value := range updates {
+		if validColumns[key] {
+			setParts = append(setParts, key+" = ?")
+			args = append(args, value)
+		}
+	}
+
+	if len(setParts) == 0 {
+		return nil
+	}
+
+	query += strings.Join(setParts, ", ") + " WHERE id = ?"
+	args = append(args, id)
+
+	res, err := r.db.Exec(query, args...)
+	if err != nil {
+		return err
+	}
+	
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return errors.New("рослину не знайдено для часткового оновлення")
+	}
+	
+	return nil
 }
