@@ -24,7 +24,11 @@ func NewPlantHandler(repo repository.PlantRepo) *PlantHandler {
 
 func (h *PlantHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /plants", h.CreatePlant)
+	mux.HandleFunc("GET /plants", h.GetAllPlants)
 	mux.HandleFunc("GET /plants/{id}", h.GetPlantByID)
+	mux.HandleFunc("PUT /plants/{id}", h.UpdatePlant)
+	mux.HandleFunc("PATCH /plants/{id}", h.PatchPlant)
+	mux.HandleFunc("DELETE /plants/{id}", h.DeletePlant)
 }
 
 func (h *PlantHandler) CreatePlant(w http.ResponseWriter, r *http.Request) {
